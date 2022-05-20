@@ -1,0 +1,1570 @@
+---
+title: " "
+output:
+   html_document:
+     css: style.css
+---
+
+<p align = "justify">
+
+<font size="5"> Data analysis for: </font>
+
+<font size="4"> Padilla Perez et al., (2022). The correlated evolution of foraging mode and reproductive output in lizards. *Proceedings of the Royal Society B*.</font>
+</p>
+
+</p></p>
+
+[Dylan J. Padilla Perez](https://dylanpadilla.netlify.app/), School of Life Sciences, Arizona State University, Tempe, AZ 85287, USA.
+</p></p>
+
+<b>
+<font size="4"> Library </font>
+</b>
+
+```{r,  echo = TRUE, warning = FALSE, message = FALSE}
+
+require(AICcmodavg)
+require(ape)
+require(caper)
+require(geiger)
+require(kableExtra)
+require(MuMIn)
+require(nlme)
+require(phytools)
+require(plotrix)
+require(shape)
+require(car)
+
+```
+
+```{r, warning = FALSE, comment = " "}
+
+R.version
+sessionInfo()
+
+```
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+
+evo_bd <- read.csv("evo_body_size_mass2.csv", row.names = 1)
+evo_bd <- evo_bd[evo_bd$diet != "Herbivorous", ]
+evo_bd <- evo_bd[evo_bd$Family != "Sphenodontidae", ]
+tree <- read.nexus("time.tree.nex")
+str(evo_bd)
+
+
+
+## Scaled mass index for females
+
+par(mar = c(6, 6, 1, 1), mgp = c(4, 1, 0))
+plot(rawFem ~ female.SVL, data = evo_bd, ylab = "Female mass (g)", xlab = "Female length (mm)", las = 1)
+
+par(mar = c(5.1, 4.1, 4.1, 2.1), mgp = c(3, 1, 0))
+plot(log(rawFem) ~ log(female.SVL), data = evo_bd, ylab = "Female mass ln(g)", xlab = "Female length ln(mm)", las = 1)
+step1 <- lm(log(rawFem) ~ log(female.SVL), data = evo_bd)
+summary(step1)
+
+L0 <- mean(evo_bd$female.SVL)
+Mi <- evo_bd$rawFem
+Li <- evo_bd$female.SVL
+
+evo_bd$M_females <- Mi*(L0/Li)^3
+
+
+## Scaled mass index for hatchlings
+
+plot(rawHatc ~ hatchling.neonate.SVL, data = evo_bd, ylab = "Hatchling mass (g)", xlab = "Hatchling length (mm)", las = 1)
+
+plot(log(rawHatc) ~ log(hatchling.neonate.SVL), data = evo_bd, ylab = "Hatchling mass log(g)", xlab = "Hatchling length log(mm)", las = 1)
+step1h <- lm(log(rawHatc) ~ log(hatchling.neonate.SVL), data = evo_bd)
+summary(step1h)
+
+L0h <- mean(evo_bd$hatchling.neonate.SVL)
+Mih <- evo_bd$rawHatc
+Lih <- evo_bd$hatchling.neonate.SVL
+
+evo_bd$M_hatchlings <- Mih*(L0h/Lih)^2.8
+head(evo_bd)
+
+
+check <- name.check(tree, evo_bd)
+rm_phy <- check$tree_not_data
+rm_dat <- check$data_not_tree
+ctree <- drop.tip(tree, rm_phy)
+
+cdat <- subset(evo_bd, subset = evo_bd$Binomial %in% ctree$tip, select = names(evo_bd)[1:27])
+name.check(ctree, cdat)
+
+
+## Mean clutch size
+
+cdat$mclutch <- (cdat$smallest.mean.clutch.size + cdat$largest.mean.clutch.size) / 2
+
+
+## Reproductive output
+
+cdat$rep_out <- (cdat$mclutch * cdat$M_hatchlings)
+str(cdat)
+
+tapply(cdat$M_females, cdat$Family, length)
+
+
+
+```
+
+</br></br>
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+par(mar = c(1, 1, 1, 1))
+plot(NA, NA, xlim = c(0, 10), ylim = c(-1, 10), ann = FALSE, axes = FALSE)
+
+
+text(5, 10, "Foraging mode")
+segments(3.5, 9.6, 6.5, 9.6, lwd = 2)
+segments(3.5, 10.4, 6.5, 10.4, lwd = 2)
+segments(3.5, 10.4, 3.5, 9.6, lwd = 2)
+segments(6.5, 10.4, 6.5, 9.6, lwd = 2)
+text(5, 7, "Distance traveled")
+segments(3.5, 6.5, 6.5, 6.5, lwd = 2)
+segments(3.5, 7.5, 6.5, 7.5, lwd = 2)
+segments(3.5, 6.5, 3.5, 7.5, lwd = 2)
+segments(6.5, 7.5, 6.5, 6.5, lwd = 2)
+text(4.97, 3.7, "Energy gain")
+segments(3.7, 4.2, 6.2, 4.2, lwd = 2)
+segments(3.7, 3.2, 6.2, 3.2, lwd = 2)
+segments(3.7, 4.2, 3.7, 3.2, lwd = 2)
+segments(6.2, 4.2, 6.2, 3.2, lwd = 2)
+text(8.6, 7, "Predation risk")
+segments(7.5, 6.5, 9.8, 6.5, lwd = 2)
+segments(7.5, 7.5, 9.8, 7.5, lwd = 2)
+segments(7.5, 6.5, 7.5, 7.5, lwd = 2)
+segments(9.8, 7.5, 9.8, 6.5, lwd = 2)
+
+text(8.64, 3.7, "Reproductive output")
+segments(7.2, 4.2, 10.1, 4.2, lwd = 2)
+segments(7.2, 3.2, 10.1, 3.2, lwd = 2)
+segments(7.2, 4.2, 7.2, 3.2, lwd = 2)
+segments(10.1, 3.2, 10.1, 4.2, lwd = 2)
+
+text(1.57, 3.7, "Energy expenditure")
+segments(0, 4.2, 3.1, 4.2, lwd = 2)
+segments(0, 3.2, 3.1, 3.2, lwd = 2)
+segments(0, 4.2, 0, 3.2, lwd = 2)
+segments(3.1, 4.2, 3.1, 3.2, lwd = 2)
+
+text(4.9, 0, "Net energy")
+segments(3.7, 0.5, 6.2, 0.5, lwd = 2)
+segments(3.7, -0.5, 6.2, -0.5, lwd = 2)
+segments(3.7, 0.5, 3.7, -0.5, lwd = 2)
+segments(6.2, 0.5, 6.2, -0.5, lwd = 2)
+
+Arrows(5, 9.5, 5, 7.8, lwd = 2, arr.type = "triangle")
+Arrows(5, 6.3, 5, 4.8, lwd = 2, arr.type = "triangle")
+Arrows(5, 4.8, 5, 6.1, lwd = 2, arr.type = "triangle")
+Arrows(3.8, 6.3, 2, 4.8, lwd = 2, arr.type = "triangle")
+Arrows(8.3, 4.76, 6.3, 6.2, lwd = 2, arr.type = "triangle")
+Arrows(8.7, 6.1, 8.7, 4.8, lwd = 2, arr.type = "triangle")
+Arrows(8.7, 4.8, 8.7, 6.1, lwd = 2, arr.type = "triangle")
+Arrows(6.6, 7, 7, 7, lwd = 2, arr.type = "triangle")
+Arrows(7.1, 3.7, 6.5, 3.7, lwd = 2, arr.type = "triangle")
+Arrows(5, 3, 5, 1, lwd = 2, arr.type = "triangle")
+Arrows(1.8, 3, 3.8, 1, lwd = 2, arr.type = "triangle")
+Arrows(6.1, 1, 8.3, 3, lwd = 2, arr.type = "triangle")
+
+```
+<p align = "justify">
+<font size="4"> **Figure 1.** A conceptual model depicting putative relationships among foraging behavior, energetics, predation risk, and reproductive output. The predicted relationships were derived from theoretical models of life-history evolution (see text for details).</font>
+</p>
+
+</br></br>
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+
+layout(matrix(c(0, 1, 0,
+                0, 1, 0,
+                0, 2, 0,
+                0, 2, 0,
+                0, 3, 0,
+                0, 3, 0), nrow = 6, ncol = 3, byrow = TRUE))
+
+
+## A
+
+
+bertalanffy <- function(la, k, t){
+
+    la <- as.numeric(la)
+    k <- as.numeric(k)
+    t <- as.numeric(t)
+    la*(1 - 4*exp(-k*t))
+
+}
+
+fem1 <- bertalanffy(la = 4, k = 0.3, t = seq(1, 35, 1))
+fem2 <- bertalanffy(la = 4.9, k = 0.25, t = seq(1, 35, 1))
+
+par(mar = c(3, 3, 2, 1), mgp = c(0.8, 0, 0), cex.lab = 1.2)
+plot(fem1 - 0.7 ~ seq(1, 35, 1), xlim = c(-2, 35), ylim = c(-6, 8), type = "l", lwd = 2, xaxt = "n", yaxt = "n", ylab = "Cumulative energy gain (m)", xlab = "time (t)")
+lines(seq(1, 35, 1) - 0.48, fem2, lwd = 2, lty = 4)
+legend("topleft", legend = c("large female", "small female"), lty = c(4, 1), lwd = c(2, 2), bty = "n", cex = 0.7)
+mtext("(a)", at = -6, line = 1, cex = 0.8, font = 2)
+
+
+
+## B
+
+fem3 <- bertalanffy(la = 5, k = 0.082, t = seq(1, 35, 1))
+fem4 <- bertalanffy(la = 10, k = 0.21, t = seq(1, 35, 1))
+
+
+par(mar = c(3, 3, 2, 1), mgp = c(0.8, 0, 0))
+
+plot(fem3 - 0.7 ~ seq(1, 35, 1), xlim = c(4, 35), ylim = c(-6, 5), type = "l", lwd = 2,  col = "skyblue", xaxt = "n", yaxt = "n", ylab = "Cumulative energy gain (m)", xlab = " ")
+lines(seq(1, 35, 1), fem4 - 8, lwd = 2, lty = 2, col = "purple")
+segments(2.6, -6.5, 25, 6.2, lwd = 2)
+segments(2.6, -6.5, 33.2, 6, lwd = 2)
+segments(13.2, -0.5, 2.6, -0.5, lwd = 2, lty = 2, col = "purple")
+segments(15.9, -1.1, 2.6, -1.1, lwd = 2, col = "skyblue")
+segments(13.2, -0.5, 13.2, -7, lwd = 2, lty = 2, col = "purple")
+segments(15.9, -1.1, 15.9, -7, lwd = 2, col = "skyblue")
+legend("topleft", legend = c("sit and wait", "widely foraging"), lty = c(1, 2), lwd = c(2, 2), col = c("skyblue", "purple"), bty = "n", cex = 0.7)
+mtext("(b)", at = 0.6, line = 1, cex = 0.8, font = 2)
+mtext(expression("t"[wf]), side = 1, at = 13.2, line = 0.5, cex = 0.8, font = 2)
+mtext(expression("t"[sw]), side = 1, at = 17.2, line = 0.5, cex = 0.8, font = 2)
+mtext("time (t)", side = 1, at = 25, line = 0.9, cex = 0.8)
+
+
+## C
+
+par(mar = c(3, 3, 2, 1), mgp = c(0.8, 0, 0))
+
+curve(2 - log(x)^2, ylim = c(-0.5, 3), xlim = c(0.1, 1), lwd = 2, lty = 2, col = "purple", xaxt = "n", yaxt = "n", ylab = "Cumulative energy gain (m)", xlab = "time (t)")
+curve(log(x) + 1, add = TRUE, lwd = 2, col = "skyblue")
+legend("topleft", legend = c("sit and wait", "widely foraging"), lty = c(1, 2), lwd = c(2, 2), col = c("skyblue", "purple"), bty = "n", cex = 0.7)
+mtext("(c)", at = 0.001, line = 1, cex = 0.8, font = 2)
+
+
+```
+<p align = "justify">
+<font size="4"> **Figure 4.** A theoretical model relating the cumulative energy gain for reproduction, m, as a function of time spent foraging, t, and maternal size. (a) Larger females reach their maximum capacity at a higher value of m than small females. (b) Widely-foraging females that are smaller but more efficient foragers may produce a greater reproductive output than larger sit-and-wait females. (c) Widely-foraging females may also produce a greater reproductive output than sit-and-wait females if they are both larger and more efficient foragers. t<sub>wf</sub> and t<sub>sw</sub> in (b) represent the optimal foraging time of widely-foraging females and sit-and-wait females, respectively.
+</p>
+
+</br></br></br>
+
+
+<font size="4"> **Fitting models (PGLS)** </font>
+
+</br>
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+
+## Lacertilia
+
+cdat$foraging.mode <- factor(cdat$foraging.mode, levels = c("widely foraging", "sit and wait", "mixed")) ## I am changing the order of the levels here so that the contrast of the coefficients can be made against the level "widely foraging".
+
+
+rawMass <- cdat
+
+rawMass <- rawMass[rawMass$rawFem < 5000, ] # Excluding a mixed-foraging species (too heavy)
+
+check_rawMass <- name.check(tree, rawMass)
+rm_phy_rawMass <- check_rawMass$tree_not_data
+rm_dat_rawMass <- check_rawMass$data_not_tree
+ctree_rawMass <- drop.tip(tree, rm_phy_rawMass)
+name.check(ctree_rawMass, rawMass)
+
+
+## Reproductive output
+
+rawMass$rep_out_mass <- (rawMass$mclutch * rawMass$rawHatc)
+
+
+## Number of individuals in each category (foraging mode)
+
+tapply(rawMass$rawFem, rawMass$foraging.mode, length)
+
+## Mean mass per category
+
+tapply(rawMass$rawFem, rawMass$foraging.mode, mean)
+
+## Mean reproductive output per category
+
+tapply(rawMass$rep_out_mass, rawMass$foraging.mode, mean)
+
+mod_mass <- gls(rep_out_mass ~ rawFem*foraging.mode, correlation = corBrownian(phy = ctree_rawMass, form = ~Binomial), data = rawMass, method = "ML")
+summary(mod_mass)
+
+mod_mass1 <- gls(rep_out_mass ~ rawFem + foraging.mode, correlation = corBrownian(phy = ctree_rawMass, form = ~Binomial), data = rawMass, method = "ML")
+summary(mod_mass1)
+
+mod_mass2 <- gls(rep_out_mass ~ rawFem*foraging.mode, correlation = corPagel(value = 0, phy = ctree_rawMass, form = ~Binomial), data = rawMass, method = "ML")
+summary(mod_mass2)
+Anova(mod_mass2, type = "III")
+
+mod_mass3 <- gls(rep_out_mass ~ rawFem + foraging.mode, correlation = corPagel(value = 0, phy = ctree_rawMass, form = ~Binomial), data = rawMass)
+summary(mod_mass3)
+
+## mod_mass2 is the most likely model even when the models below are included in the analysis
+
+#mod_mass4 <- gls(rep_out_mass ~ rawFem*foraging.mode, correlation = corPagel(value = 1, phy = ctree_rawMass, form = ~Binomial), data = rawMass, method = "ML")
+#summary(mod_mass4)
+
+#mod_mass5 <- gls(rep_out_mass ~ rawFem + foraging.mode, correlation = corPagel(value = 1, phy = ctree_rawMass, form = ~Binomial), data = rawMass)
+#summary(mod_mass5)
+
+
+## Model selection table
+
+output_rawMass <- model.sel(mod_mass, mod_mass1, mod_mass2, mod_mass3)
+
+sel.table_mass <- round(as.data.frame(output_rawMass)[8:12], 3)
+names(sel.table_mass)[1] <- "K"
+sel.table_mass$Model <- rownames(sel.table_mass)
+sel.table_mass$Model <- as.character(c(formula(mod_mass2), formula(mod_mass3), formula(mod_mass), formula(mod_mass1)))
+sel.table_mass <- sel.table_mass[ , c(6, 1, 2, 3, 4, 5)]
+sel.table_mass
+
+```
+
+
+</br></br></br>
+
+
+<font size="4"> **Model checking (raw mass)** </font>
+
+</br>
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+
+plot(mod_mass2, resid(., type = "n") ~ fitted(.), main = "Residuals v Fitted Values", abline = c(0, 0))
+
+res <- resid(mod_mass2, type="n")
+qqnorm(res, las = 1)
+qqline(res)
+
+
+```
+
+</br></br>
+
+
+<p align = "justify">
+<font size="4"> A visual check of the most likely model indicates that the homogeneity and normality of residuals seem to be affected by influential cases (i.e., outliers). As a result, we standardized hatchling mass and maternal mass to alleviate this issue (see model checking below). In doing so, we recovered a more symetrical distibution of body mass among lizard species, increasing the robustness of our analysis. Influential cases should not be dropped from the model as there is no reasonable justification to do so. Instead, the patterns observed in our study could be resolved or even alter as more or better data become available.</font>
+</p>
+
+
+
+</br></br>
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+
+## Standardized mass, M.
+
+dat_full <- cdat
+
+check_full <- name.check(tree, dat_full)
+rm_phy_full <- check_full$tree_not_data
+rm_dat_full <- check_full$data_not_tree
+ctree_full <- drop.tip(tree, rm_phy_full)
+name.check(ctree_full, dat_full)
+
+
+## Number of individuals in each category (foraging mode)
+
+tapply(dat_full$M_females, dat_full$foraging.mode, length)
+
+## Mean scaled mass index per category
+
+tapply(dat_full$M_females, dat_full$foraging.mode, mean)
+
+## Mean reproductive output per category
+
+tapply(dat_full$rep_out, dat_full$foraging.mode, mean)
+
+
+full_mod <- gls(rep_out ~ M_females*foraging.mode, correlation = corBrownian(phy = ctree_full, form = ~Binomial), data = dat_full, method = "ML")
+summary(full_mod)
+
+
+full_mod1 <- gls(rep_out ~ M_females + foraging.mode, correlation = corBrownian(phy = ctree_full, form = ~Binomial), data = dat_full, method = "ML")
+summary(full_mod1)
+
+
+full_mod2 <- gls(rep_out ~ M_females*foraging.mode, correlation = corPagel(value = 0, phy = ctree_full, form = ~Binomial), data = dat_full, method = "ML")
+summary(full_mod2)
+
+full_mod3 <- gls(rep_out ~ M_females + foraging.mode, correlation = corPagel(value = 0, phy = ctree_full, form = ~Binomial), data = dat_full, method = "ML")
+summary(full_mod3)
+
+#full_mod4 <- gls(rep_out ~ M_females*foraging.mode, correlation = corPagel(value = 1, phy = ctree_full, form = ~Binomial, fixed = FALSE), data = dat_full, method = "ML")
+#summary(full_mod4)
+
+#full_mod5 <- gls(rep_out ~ M_females + foraging.mode, correlation = corPagel(value = 1, phy = ctree_full, form = ~Binomial, fixed = FALSE), data = dat_full, method = "ML")
+#summary(full_mod5)
+
+#full_mod6 <- gls(rep_out ~ M_females*foraging.mode, correlation = corMartins(value = 1, phy = ctree_full, form = ~Binomial, fixed = FALSE), data = dat_full, method = "ML")
+#summary(full_mod6)
+
+
+```
+
+
+</br></br></br>
+
+
+<font size="4"> **Model checking (scaled mass index)** </font>
+
+</br>
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+
+plot(full_mod2, resid(., type = "n") ~ fitted(.), main = "Residuals v Fitted Values", abline = c(0, 0))
+
+res2 <- resid(full_mod2, type="n")
+qqnorm(res2, las = 1)
+qqline(res2)
+
+```
+
+
+
+</br></br></br>
+
+<font size="4"> **Table S1.** Model selection table of candidate models included in the analysis</font>
+
+
+```{r, results = "asis", echo = TRUE}
+
+
+output_full <- model.sel(full_mod, full_mod1, full_mod2, full_mod3)
+
+sel.table_full <- round(as.data.frame(output_full)[7:11], 3)
+names(sel.table_full)[1] <- "K"
+sel.table_full$Model <- rownames(sel.table_full)
+sel.table_full$Model <- as.character(c(formula(full_mod2), formula(full_mod3), formula(full_mod), formula(full_mod1)))
+sel.table_full <- sel.table_full[ , c(6, 1, 2, 3, 4, 5)]
+
+
+kable(sel.table_full, digits = 3, row.names = FALSE) %>%
+  kable_styling(bootstrap_options = "striped", full_width = FALSE, position = "center")
+
+```
+
+
+</br></br>
+<p align = "justify">
+<font size="4"> **Table 1.** Analysis of Deviance Table (Type III tests) for the most likely model, based on the ranking of AICc for potential candidate models.</font>
+</p>
+```{r, results = "asis", echo = FALSE}
+
+
+kable(Anova(full_mod2, type = "III"), digits = 3, row.names = TRUE) %>%
+  kable_styling(bootstrap_options = "striped", full_width = FALSE, position = "center")
+
+
+```
+
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+
+
+layout(matrix(c(0, 0, 0, 0,
+                1, 1, 2, 2,
+                1, 1, 2, 2,
+                3, 3, 4, 4,
+                3, 3, 4, 4,
+                0, 0, 0, 0), nrow = 6, ncol = 4, byrow = TRUE))
+
+
+par(mar = c(0, 5, 0, 0.5))
+
+
+## Distribution of body size
+
+
+rm1 <- density(rawMass$rawFem[rawMass$foraging.mode == "widely foraging"])
+rm2 <- density(rawMass$rawFem[rawMass$foraging.mode == "mixed"])
+rm3 <- density(rawMass$rawFem[rawMass$foraging.mode == "sit and wait"])
+plot(1, type = "n", ann = FALSE, bty = "n", xaxt = "n", yaxt = "n")
+
+
+par(mar = c(0, 4, 0, 0.5))
+
+t1 <- density(dat_full$M_females[dat_full$foraging.mode == "widely foraging"])
+t2 <- density(dat_full$M_females[dat_full$foraging.mode == "mixed"])
+t3 <- density(dat_full$M_females[dat_full$foraging.mode == "sit and wait"])
+plot(t1, ylim = c(0, max(c(t1$y, t1$y))), ann = FALSE, bty = "n", xaxt = "n", yaxt = "n")
+polygon(t1, col = rgb(0.8, 0, 0.7, alpha = 0.3))
+lines(t2)
+polygon(t2, col = rgb(0.8, 0, 0, alpha = 0.3))
+lines(t3)
+polygon(t3, col = rgb(0, 0, 1, alpha = 0.2))
+
+
+
+## Lacertilia
+
+## Raw mass
+
+
+## widely foraging
+
+rw_fg <- rawMass[rawMass$foraging.mode == "widely foraging", ]
+
+check_rm_wf <- name.check(tree, rw_fg)
+rm_phy_rm_wf <- check_rm_wf$tree_not_data
+rm_dat_rm_wf <- check_rm_wf$data_not_tree
+ctree_rm_wf <- drop.tip(tree, rm_phy_rm_wf)
+#name.check(ctree_rm_wf, rw_fg)
+
+
+
+SSX.rm_wf <- sum(round((rw_fg$rawFem - mean(rw_fg$rawFem))^2), 2)
+s2.rm_wf <- var(rw_fg$rep_out_mass)
+n.rm_wf <- length(rw_fg$rep_out_mass)
+x.rm_wf <- seq(0.50, 4072.0, 1)
+m.x.rm_wf <- mean(round(rw_fg$rawFem,1))
+se.rm_wf <- sqrt(s2.rm_wf*((1/n.rm_wf) + (((x.rm_wf - m.x.rm_wf)^2)/SSX.rm_wf)))
+is.rm_wf <- qt(0.975, df = n.rm_wf - 2)
+ii.rm_wf <- qt(0.025, df = n.rm_wf - 2)
+ic.s.rm_wf <- se.rm_wf*is.rm_wf
+ic.i.rm_wf <- se.rm_wf*ii.rm_wf
+upper.i.rm_wf <- (coef(mod_mass2)[1] + coef(mod_mass2)[2]*x.rm_wf) + ic.s.rm_wf
+lower.i.rm_wf <- (coef(mod_mass2)[1] + coef(mod_mass2)[2]*x.rm_wf) + ic.i.rm_wf
+
+
+# sit and wait
+
+
+rm_sw <- rawMass[rawMass$foraging.mode == "sit and wait", ]
+
+check_rm_sw <- name.check(tree, rm_sw)
+rm_phy_rm_sw <- check_rm_sw$tree_not_data
+rm_dat_rm_sw <- check_rm_sw$data_not_tree
+ctree_rm_sw <- drop.tip(tree, rm_phy_rm_sw)
+#name.check(ctree_rm_sw, rm_sw)
+
+
+
+SSX.rm_sw <- sum(round((rm_sw$rawFem - mean(rm_sw$rawFem))^2), 2)
+s2.rm_sw <- var(rm_sw$rep_out_mass)
+n.rm_sw <- length(rm_sw$rep_out_mass)
+x.rm_sw <- seq(0.28, 3127.7, 1)
+m.x.rm_sw <- mean(round(rm_sw$rawFem, 1))
+se.rm_sw <- sqrt(s2.rm_sw*((1/n.rm_sw) + (((x.rm_sw - m.x.rm_sw)^2)/SSX.rm_sw)))
+is.rm_sw <- qt(0.975, df = n.rm_sw - 2)
+ii.rm_sw <- qt(0.025, df = n.rm_sw - 2)
+ic.s.rm_sw <- se.rm_sw*is.rm_sw
+ic.i.rm_sw <- se.rm_sw*ii.rm_sw
+upper.i.rm_sw <- ((coef(mod_mass2)[1] + coef(mod_mass2)[3]) + (coef(mod_mass2)[2] + coef(mod_mass2)[5])*x.rm_sw) + ic.s.rm_sw
+lower.i.rm_sw <- ((coef(mod_mass2)[1] + coef(mod_mass2)[3]) + (coef(mod_mass2)[2] + coef(mod_mass2)[5])*x.rm_sw) + ic.i.rm_sw
+
+
+
+## mixed
+
+rm_mx <- rawMass[rawMass$foraging.mode == "mixed", ]
+
+
+check_rm_mx <- name.check(tree, rm_mx)
+rm_phy_rm_mx <- check_rm_mx$tree_not_data
+rm_dat_rm_mx <- check_rm_mx$data_not_tree
+ctree_rm_mx <- drop.tip(tree, rm_phy_rm_mx)
+#name.check(ctree_rm_mx, rm_mx)
+
+
+SSX.rm_mx <- sum(round((rm_mx$rawFem - mean(rm_mx$rawFem))^2), 2)
+s2.rm_mx <- var(rm_mx$rep_out_mass)
+n.rm_mx <- length(rm_mx$rep_out_mass)
+x.rm_mx <- seq(0.44, 222.1, 1)
+m.x.rm_mx <- mean(round(rm_mx$rawFem, 1))
+se.rm_mx <- sqrt(s2.rm_mx*((1/n.rm_mx) + (((x.rm_mx - m.x.rm_mx)^2)/SSX.rm_mx)))
+is.rm_mx <- qt(0.975, df = n.rm_mx - 2)
+ii.rm_mx <- qt(0.025, df = n.rm_mx - 2)
+ic.s.rm_mx <- se.rm_mx*is.rm_mx
+ic.i.rm_mx <- se.rm_mx*ii.rm_mx
+upper.i.rm_mx.f <- ((coef(mod_mass2)[1] + coef(mod_mass2)[4]) + (coef(mod_mass2)[2] + coef(mod_mass2)[6])*x.rm_mx) + ic.s.rm_mx
+lower.i.rm_mx.f <- ((coef(mod_mass2)[1] + coef(mod_mass2)[4]) + (coef(mod_mass2)[2] + coef(mod_mass2)[6])*x.rm_mx) + ic.i.rm_mx
+
+
+
+par(mar = c(0, 5, 0, 0.5), mgp = c(3.2, 1, 0), las = 1)
+
+
+plot(rawMass$rep_out_mass ~ rawMass$rawFem, type = "p", xlab = "mass (g)", ylab = "Hatchling mass x clutch size (g)", cex.lab = 1.5, pch = 21, bg = c("purple", "skyblue", "red")[as.numeric(rawMass$foraging.mode)], col = c("purple", "skyblue", "red")[as.numeric(rawMass$foraging.mode)])
+
+
+polygon(c(rev(x.rm_mx), x.rm_mx), c(rev(lower.i.rm_mx.f), upper.i.rm_mx.f), border = FALSE, col = rgb(0.8, 0, 0, alpha = 0.3))
+lines(x = x.rm_mx, y = ((coef(mod_mass2)[1] + coef(mod_mass2)[4]) + (coef(mod_mass2)[2] + coef(mod_mass2)[6])*x.rm_mx), col = "red", lwd = 2, lty = 15)
+
+polygon(c(rev(x.rm_sw), x.rm_sw), c(rev(lower.i.rm_sw), upper.i.rm_sw), border = FALSE, col = rgb(0, 0, 1, alpha = 0.2))
+lines(x = x.rm_sw, y = ((coef(mod_mass2)[1] + coef(mod_mass2)[3]) + (coef(mod_mass2)[2] + coef(mod_mass2)[5])*x.rm_sw), col = "skyblue", lwd = 2, lty = 2)
+
+polygon(c(rev(x.rm_wf), x.rm_wf), c(rev(lower.i.rm_wf), upper.i.rm_wf), border = FALSE, col = rgb(0.8, 0, 0.7, alpha = 0.3))
+lines(x = x.rm_wf, y = (coef(mod_mass2)[1] + coef(mod_mass2)[2]*x.rm_wf), col = "purple", lwd = 2, lty = 2)
+
+mtext("(a)", side = 3, line = 1, at = -600, font = 2)
+mtext("mass (g)", side = 1, line = 4, cex = 1)
+
+legend("topleft", legend = c("mixed", "sit and wait", "widely foraging"), lty = c(15, 1, 2), bty = "n", pch = c(16, 16, 16), bg = c("black", "black", "black"), col = c("red", "skyblue", "purple"), cex = 1)
+
+
+
+
+
+## Scaled mass index
+
+## widely foraging
+
+wf <- dat_full[dat_full$foraging.mode == "widely foraging", ]
+
+check_wf <- name.check(tree, wf)
+rm_phy_wf <- check_wf$tree_not_data
+rm_dat_wf <- check_wf$data_not_tree
+ctree_wf <- drop.tip(tree, rm_phy_wf)
+#name.check(ctree_wf, wf)
+
+
+SSX.wf <- sum(round((wf$M_females - mean(wf$M_females))^2), 2)
+s2.wf <- var(wf$rep_out)
+n.wf <- length(wf$rep_out)
+x.wf <- seq(1.2, 31.8, 1)
+m.x.wf <- mean(round(wf$M_females,1))
+se.wf <- sqrt(s2.wf*((1/n.wf) + (((x.wf - m.x.wf)^2)/SSX.wf)))
+is.wf <- qt(0.975, df = n.wf - 2)
+ii.wf <- qt(0.025, df = n.wf - 2)
+ic.s.wf <- se.wf*is.wf
+ic.i.wf <- se.wf*ii.wf
+upper.i <- (coef(full_mod2)[1] + coef(full_mod2)[2]*x.wf) + ic.s.wf
+lower.i <- (coef(full_mod2)[1] + coef(full_mod2)[2]*x.wf) + ic.i.wf
+
+
+
+## sit and wait
+
+
+sw <- dat_full[dat_full$foraging.mode == "sit and wait", ]
+
+check_sw <- name.check(tree, sw)
+rm_phy_sw <- check_sw$tree_not_data
+rm_dat_sw <- check_sw$data_not_tree
+ctree_sw <- drop.tip(tree, rm_phy_sw)
+#name.check(ctree_sw, sw)
+
+
+
+SSX.sw <- sum(round((sw$M_females - mean(sw$M_females))^2), 2)
+s2.sw <- var(sw$rep_out)
+n.sw <- length(sw$rep_out)
+x.sw <- seq(1.3, 30.8, 1)
+m.x.sw <- mean(round(sw$M_females, 1))
+se.sw <- sqrt(s2.sw*((1/n.sw) + (((x.sw - m.x.sw)^2)/SSX.sw)))
+is.sw <- qt(0.975, df = n.sw - 2)
+ii.sw <- qt(0.025, df = n.sw - 2)
+ic.s.sw <- se.sw*is.sw
+ic.i.sw <- se.sw*ii.sw
+upper.i.sw <- ((coef(full_mod2)[1] + coef(full_mod2)[3]) + (coef(full_mod2)[2] + coef(full_mod2)[5])*x.sw) + ic.s.sw
+lower.i.sw <- ((coef(full_mod2)[1] + coef(full_mod2)[3]) + (coef(full_mod2)[2] + coef(full_mod2)[5])*x.sw) + ic.i.sw
+
+
+## mixed
+
+mx <- dat_full[dat_full$foraging.mode == "mixed", ]
+
+
+check_mx <- name.check(tree, mx)
+rm_phy_mx <- check_mx$tree_not_data
+rm_dat_mx <- check_mx$data_not_tree
+ctree_mx <- drop.tip(tree, rm_phy_mx)
+#name.check(ctree_mx, mx)
+
+
+SSX.mx <- sum(round((mx$M_females - mean(mx$M_females))^2), 2)
+s2.mx <- var(mx$rep_out)
+n.mx <- length(mx$rep_out)
+x.mx <- seq(1.0, 27.7, 1)
+m.x.mx <- mean(round(mx$M_females, 1))
+se.mx <- sqrt(s2.mx*((1/n.mx) + (((x.mx - m.x.mx)^2)/SSX.mx)))
+is.mx <- qt(0.975, df = n.mx - 2)
+ii.mx <- qt(0.025, df = n.mx - 2)
+ic.s.mx <- se.mx*is.mx
+ic.i.mx <- se.mx*ii.mx
+upper.i.mx.f <- ((coef(full_mod2)[1] + coef(full_mod2)[4]) + (coef(full_mod2)[2] + coef(full_mod2)[6])*x.mx) + ic.s.mx
+lower.i.mx.f <- ((coef(full_mod2)[1] + coef(full_mod2)[4]) + (coef(full_mod2)[2] + coef(full_mod2)[6])*x.mx) + ic.i.mx
+
+
+par(mar = c(0, 4, 0, 0.5), mgp = c(2.8, 1, 0), las = 1)
+
+
+plot(dat_full$rep_out ~ dat_full$M_females, type = "p", xlab = " ", ylab = "Hatchling mass x clutch size (g)", cex.lab = 1.5, pch = 21, bg = c("purple", "skyblue", "red")[as.numeric(dat_full$foraging.mode)], col = c("purple", "skyblue", "red")[as.numeric(dat_full$foraging.mode)])
+
+polygon(c(rev(x.mx), x.mx), c(rev(lower.i.mx.f), upper.i.mx.f), border = FALSE, col = rgb(0.8, 0, 0, alpha = 0.3))
+lines(x = x.mx, y = ((coef(full_mod2)[1] + coef(full_mod2)[4]) + (coef(full_mod2)[2] + coef(full_mod2)[6])*x.mx), col = "red", lwd = 2, lty = 15)
+
+polygon(c(rev(x.sw), x.sw), c(rev(lower.i.sw), upper.i.sw), border = FALSE, col = rgb(0, 0, 1, alpha = 0.2))
+lines(x = x.sw, y = ((coef(full_mod2)[1] + coef(full_mod2)[3]) + (coef(full_mod2)[2] + coef(full_mod2)[5])*x.sw), col = "skyblue", lwd = 2, lty = 2)
+
+polygon(c(rev(x.wf), x.wf), c(rev(lower.i), upper.i), border = FALSE, col = rgb(0.8, 0, 0.7, alpha = 0.3))
+lines(x = x.wf, y = coef(full_mod2)[1] + coef(full_mod2)[2]*x.wf, col = "purple", lwd = 2, lty = 2)
+
+mtext("(b)", side = 3, line = 1, at = -2, font = 2)
+mtext(expression(hat(M) (g)), side = 1, line = 4, cex = 1)
+
+legend("topleft", legend = c("mixed", "sit-and-wait foraging", "widely foraging"), lty = c(15, 1, 2), bty = "n", pch = c(16, 16, 16), bg = c("black", "black", "black"), col = c("red", "skyblue", "purple"), cex = 1)
+
+
+```
+<p align = "justify">
+<font size="4"> **Figure 3.** Effects of maternal mass and foraging mode on the evolution of reproductive output of lizards, as determined by phylogenetic generalized least squares analysis. (a) Difference in reproductive output among foraging modes assuming body mass as a proxy for energy. (b) Difference in reproductive output among foraging modes assuming the scaled mass index as a proxy for energy.</font>
+</p>
+
+
+</br></br></br>
+
+
+<b>
+<font size="4"> **Ancenstral state reconstruction** </font>
+</b>
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+
+dev.off()
+
+set.seed(1094)
+
+
+## Ancestral character state
+
+anc_st <- cdat[ , c(25, 23)]
+anc_st[486, ] <- c("Sphenodon_punctatus", "sit and wait")
+rownames(anc_st)[486] <- "Sphenodon_punctatus"
+
+check_st <- name.check(tree, anc_st)
+rm_phy_st <- check_st$tree_not_data
+rm_dat_st <- check_st$data_not_tree
+ctree_st <- drop.tip(tree, rm_phy_st)
+
+anc_st <- subset(anc_st, subset = rownames(anc_st) %in% ctree_st$tip, select = names(anc_st)[1:2])
+#name.check(ctree, anc_st)
+
+forg <- as.matrix(anc_st)[,2]
+head(forg)
+
+
+## Reproductive output
+
+anc_st_rp <- cdat[ , c(29, 23)]
+anc_st_rp[486, 1] <- 0
+anc_st_rp[486, 2] <- "sit and wait"
+rownames(anc_st_rp)[486] <- "Sphenodon_punctatus"
+
+check_rp <- name.check(tree, anc_st_rp)
+rm_phy_rp <- check_rp$tree_not_data
+rm_dat_rp <- check_rp$data_not_tree
+ctree_rp <- drop.tip(tree, rm_phy_rp)
+
+anc_st_rp <- subset(anc_st_rp, subset = rownames(anc_st_rp) %in% ctree_rp$tip, select = names(anc_st_rp)[1:2])
+#name.check(ctree, anc_st_rp)
+anc_st_rp$rep_out <- as.numeric(anc_st_rp$rep_out)
+anc_st_rp$foraging.mode <- as.factor(anc_st_rp$foraging.mode)
+
+anc_st_rp_bars <- anc_st_rp[1]
+anc_st_rp_bars <- as.matrix(anc_st_rp_bars)[ , 1]
+head(anc_st_rp_bars)
+
+## Reproductive output for widely foraging and sit-and-wait species
+
+anc_st_rp2 <- anc_st_rp[anc_st_rp$foraging.mode != "mixed", ]
+
+check_rp2 <- name.check(tree, anc_st_rp2)
+rm_phy_rp2 <- check_rp2$tree_not_data
+rm_dat_rp2 <- check_rp2$data_not_tree
+ctree_rp2 <- drop.tip(tree, rm_phy_rp2)
+
+anc_st_rp2 <- subset(anc_st_rp2, subset = rownames(anc_st_rp2) %in% ctree_rp2$tip, select = names(anc_st_rp2)[1:2])
+#name.check(ctree_rp2, anc_st_rp2)
+anc_st_rp2$rep_out <- as.numeric(anc_st_rp2$rep_out)
+anc_st_rp2$foraging.mode <- as.factor(anc_st_rp2$foraging.mode)
+
+anc_st_rp2_bars <- anc_st_rp2[1]
+anc_st_rp2_bars <- as.matrix(anc_st_rp2_bars)[ , 1]
+head(anc_st_rp2_bars)
+
+
+
+## Use of function ace (for comparison)
+
+
+fitER <- ace(forg, ctree_st, model = "ER", type = "discrete")
+fitARD <- ace(forg, ctree_st, model = "ARD", type = "discrete")
+fitSR <- ace(forg, ctree_st, model = "SYM", type = "discrete")
+
+
+fitER
+fitARD
+fitSR
+
+head(round(fitER$lik.anc, 3))
+head(round(fitARD$lik.anc, 3))
+head(round(fitSR$lik.anc, 3))
+
+
+```
+
+
+</br></br></br>
+
+
+<font size="4"> **Table S2.** </font>
+
+
+```{r, results = "asis"}
+
+
+ic <- data.frame(Model = c("ER", "ARD", "SYM"), AIC = c(AIC(fitER), AIC(fitARD), AIC(fitSR)), stringsAsFactors = FALSE)
+
+kable(ic, digits = 3, row.names = FALSE) %>%
+  kable_styling(bootstrap_options = "striped", full_width = FALSE, position = "center")
+
+```
+
+
+</br></br></br>
+
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+
+## Overlaying posterior probabilities on the tree. This is done for the best fit model.
+
+
+colors <- c("red", "skyblue", "purple")
+cols <- setNames(colors[1:length(unique(forg))], sort(unique(forg)))
+
+
+plotTree(ctree_st, type = "fan", fsize = 0.2, ftype = "i", part = 0.98)
+t <- max(nodeHeights(ctree_st))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(115, 45, "1", cex = 1)
+text(32, 90, "2", cex = 1)
+text(-105, 25, "3", cex = 1)
+text(-135, -70, "4", cex = 1)
+text(-45, -65, "5", cex = 1)
+text(-8, -95, "6", cex = 1)
+text(scale, rep(-23, length(scale)), t - scale, cex = 0.6)
+text(mean(scale), -38, "time (mya)", cex = 0.7)
+
+nodelabels(node = 1:ctree_st$Nnode + Ntip(ctree_st), pie = fitARD$lik.anc, piecol = cols, cex = 0.2)
+tiplabels(pie = to.matrix(forg[ctree_st$tip.label], unique(sort(forg))), piecol = cols, cex = 0.1)
+add.simmap.legend(colors = cols, prompt = FALSE, x= 0.9*par()$usr[1], y = -max(nodeHeights(ctree_st)), fsize = 0.8)
+
+
+ASER <- make.simmap(ctree_st, forg,  model = "ER", nsim = 1, pi = "estimated", Q = "mcmc")
+ASARD <- make.simmap(ctree_st, forg,  model = "ARD", nsim = 1, pi = "estimated", Q = "mcmc")
+ASSR <- make.simmap(ctree_st, forg,  model = "SYM", nsim = 1, pi = "estimated", Q = "mcmc")
+
+
+```
+
+
+</br></br></br>
+
+
+<font size="4"> **Table S3.** </font>
+
+
+```{r, results = "asis"}
+
+
+as <- data.frame(Model = c("modER", "modARD", "modSYM"), AIC = c(AIC(ASER), AIC(ASARD), AIC(ASSR)), stringsAsFactors = FALSE)
+
+kable(as, digits = 3, row.names = FALSE) %>%
+  kable_styling(bootstrap_options = "striped", full_width = FALSE, position = "center")
+
+```
+
+
+</br></br></br>
+
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+
+## Simulate 1000 stochastic character maps using empirical Bayes method
+
+
+ASER <- make.simmap(ctree_st, forg,  model = "ER", nsim = 1000, pi = "estimated", Q = "mcmc")
+
+
+pd <- summary(ASER, plot = FALSE)
+pd
+
+save <- countSimmap(ASER)
+
+
+min(save$Tr[,1])
+write.table(pd$ace, "likelihood_nodes_ASER.csv", sep = ",")
+
+
+
+## What happens if the tuatara is excluded?
+
+
+forgt <- forg[-486]
+
+
+ASERT <- make.simmap(ctree, forgt,  model = "ER", nsim = 1000, pi = "estimated", Q = "mcmc")
+
+
+pdt <- summary(ASERT, plot = FALSE)
+pdt
+
+savet <- countSimmap(ASERT)
+
+
+min(savet$Tr[,1])
+write.table(pdt$ace, "likelihood_nodes_ASERT.csv", sep = ",")
+
+
+## Phylogenetic signal of foraging modes
+
+
+anc_st_rp2$Binomial <- rownames(anc_st_rp2)
+
+phylo.d(anc_st_rp2, ctree_rp2, Binomial, binvar = foraging.mode, permut = 5000)
+
+
+## Estimating ancestral character state only for widely foraging and sit-and-wait species
+
+
+forg2 <- as.matrix(anc_st_rp2)[ , 2]
+head(forg2)
+
+
+ASER2 <- make.simmap(ctree_rp2, forg2, model = "ER", nsim = 1, pi = "estimated", Q = "mcmc")
+ASARD2 <- make.simmap(ctree_rp2, forg2, model = "ARD", nsim = 1, pi = "estimated", Q = "mcmc")
+ASSR2 <- make.simmap(ctree_rp2, forg2, model = "SYM", nsim = 1, pi = "estimated", Q = "mcmc")
+
+
+```
+
+
+
+</br></br></br>
+
+
+<font size="4"> **Table S4.** </font>
+
+
+
+```{r, results = "asis"}
+
+
+as2 <- data.frame(Model = c("modER2", "modARD2", "modSR2"), AIC = c(AIC(ASER2), AIC(ASARD2), AIC(ASSR2)), stringsAsFactors = FALSE)
+kable(as2, digits = 3, row.names = FALSE) %>%
+  kable_styling(bootstrap_options = "striped", full_width = FALSE, position = "center")
+
+```
+
+</br></br>
+
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+
+## simulate 1000 stochastic character maps using empirical Bayes method (excluding mixed foragers)
+
+
+ASSYM2 <- make.simmap(ctree_rp2, forg2, model = "SYM", nsim = 1000, pi = "estimated", Q = "mcmc")
+
+
+pd2 <- summary(ASSYM2, plot = FALSE)
+pd2
+
+save2 <- countSimmap(ASSYM2)
+
+min(save2$Tr[,1])
+write.table(pd2$ace, "likelihood_nodes_ASSYM2.csv", sep = ",")
+
+
+
+## simulate 1000 stochastic character maps using empirical Bayes method (excluding mixed foragers and the tuatara)
+
+
+forg2T <- cdat[ , c(25, 23)]
+forg2T <- forg2T[forg2T$foraging.mode != "mixed", ]
+
+check_st2 <- name.check(tree, forg2T)
+rm_phy_st2 <- check_st2$tree_not_data
+rm_dat_st2 <- check_st2$data_not_tree
+ctree_st2 <- drop.tip(tree, rm_phy_st2)
+
+forg2T <- subset(forg2T, subset = rownames(forg2T) %in% ctree_st2$tip, select = names(forg2T)[1:2])
+#name.check(ctree_st2, forg2T)
+
+forg2T <- as.matrix(forg2T)[,2]
+head(forg2T)
+
+
+ASSYMT <- make.simmap(ctree_st2, forg2T, model = "SYM", nsim = 1000, pi = "estimated", Q = "mcmc")
+
+
+pd2T <- summary(ASSYMT, plot = FALSE)
+pd2T
+
+save2T <- countSimmap(ASSYMT)
+
+min(save2T$Tr[,1])
+write.table(pd2T$ace, "likelihood_nodes_ASSYMT.csv", sep = ",")
+
+
+## Plotting trees
+
+colors <- c("red", "skyblue", "purple")
+cols <- setNames(colors[1:length(unique(forg))], sort(unique(forg)))
+colorbars <-setNames(c("red", "skyblue", "purple"), c("mixed", "sit and wait", "widely foraging"))
+ss <-getStates(ASER, "tips")
+barcols <- setNames(sapply(ss, function(x, y) y[which(names(y) == x)], y = colorbars), names(ss))
+
+i <- 1:1000
+
+plotTree.wBars(ASER[[sample(i, 1)]], log1p(anc_st_rp_bars), type = "fan", method = "plotSimmap", colors = cols, scale = 4, fsize = 0.2, tip.labels = FALSE, part = 0.98, col = barcols, border = FALSE)
+t1 <- max(nodeHeights(ctree_st))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t1, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(119, 45, "1", cex = 1)
+text(32, 90, "2", cex = 1)
+text(-105, 25, "3", cex = 1)
+text(-135, -70, "4", cex = 1)
+text(-45, -65, "5", cex = 1)
+text(-8, -95, "6", cex = 1)
+text(scale, rep(-23, length(scale)), t1 - scale, cex = 0.9)
+text(mean(scale), -40, "time (mya)", cex = 0.9)
+nodelabels(pie = pd$ace, piecol = cols, cex = 0.26)
+add.simmap.legend(colors = cols, prompt = FALSE, x = -120, y = 140, fsize = 0.9)
+
+
+
+```
+<p align = "justify">
+<font size="4"> **Figure 2.** Random sample of stochastic character maps depicting the evolution of foraging mode in 485 species of lizards. Bars at the tips of the phylogeny represent log-transformed values of reproductive output for all lizards, but not the outgroup,<i>Sphenodon punctatus</i>. Pie charts on internal nodes represent posterior probability estimates resulting from 1,000 simulations of the character histories. Major clades are enumerated as follows: 1) Gekkota, 2) Scincoidea, 3) Lacertoidea, 4) Anguimorpha, 5) Toxicofera, and 6) Iguania. Lizard photos by Mark O’Shea. </font>
+</p>
+
+
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+## Ancestral state reconstruction excluding the tuatara
+
+colst <- setNames(colors[1:length(unique(forgt))], sort(unique(forgt)))
+sst <-getStates(ASERT, "tips")
+colorbars <-setNames(c("red", "skyblue", "purple"), c("mixed", "sit and wait", "widely foraging"))
+barcolst <- setNames(sapply(sst, function(x, y) y[which(names(y) == x)], y = colorbars), names(sst))
+
+iT <- 1:1000
+
+plotTree.wBars(ASERT[[sample(iT, 1)]], log1p(anc_st_rp_bars[-486]), type = "fan", method = "plotSimmap", colors = colst, scale = 4, fsize = 0.2, tip.labels = FALSE, part = 0.98, col = barcolst, border = FALSE)
+t2 <- max(nodeHeights(ctree))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t2, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(55, 20, "1", cex = 1)
+text(10, 20, "2", cex = 1)
+text(-30, 8, "3", cex = 1)
+text(-72, -38, "4", cex = 1)
+text(-11, -24, "5", cex = 1)
+text(-8, -40, "6", cex = 1)
+text(scale, rep(-20, length(scale)), t2 - scale, cex = 0.7)
+text(mean(scale), -35, "time (mya)", cex = 0.9)
+nodelabels(pie = pdt$ace, piecol = colst, cex = 0.3)
+add.simmap.legend(colors = colst, prompt = FALSE, x = -80, y = 90, fsize = 0.9)
+
+```
+
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE, include = FALSE}
+
+
+jpeg("tree_ASER_pailess.jpeg", height = 2000, width = 2000, res = 250)
+
+colors <- c("red", "skyblue", "purple")
+cols <- setNames(colors[1:length(unique(forg))], sort(unique(forg)))
+colorbars <-setNames(c("red", "skyblue", "purple"), c("mixed", "sit and wait", "widely foraging"))
+ss <-getStates(ASER, "tips")
+barcols <- setNames(sapply(ss, function(x, y) y[which(names(y) == x)], y = colorbars), names(ss))
+
+i <- 1:1000
+
+plotTree.wBars(ASER[[sample(i, 1)]], log1p(anc_st_rp_bars), type = "fan", method = "plotSimmap", colors = cols, scale = 4, fsize = 0.2, tip.labels = FALSE, part = 0.98, col = barcols, border = FALSE)
+t1 <- max(nodeHeights(ctree_st))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t1, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(119, 45, "1", cex = 1)
+text(32, 90, "2", cex = 1)
+text(-105, 25, "3", cex = 1)
+text(-135, -70, "4", cex = 1)
+text(-45, -65, "5", cex = 1)
+text(-8, -95, "6", cex = 1)
+text(scale, rep(-23, length(scale)), t1 - scale, cex = 0.9)
+text(mean(scale), -40, "time (mya)", cex = 0.9)
+#nodelabels(pie = pd$ace, piecol = cols, cex = 0.3)
+add.simmap.legend(colors = cols, prompt = FALSE, x = -120, y = 140, fsize = 0.9)
+
+
+dev.off()
+
+
+jpeg("tree_ASER.jpeg", height = 2000, width = 2000, res = 250)
+
+colors <- c("red", "skyblue", "purple")
+cols <- setNames(colors[1:length(unique(forg))], sort(unique(forg)))
+colorbars <-setNames(c("red", "skyblue", "purple"), c("mixed", "sit and wait", "widely foraging"))
+ss <-getStates(ASER, "tips")
+barcols <- setNames(sapply(ss, function(x, y) y[which(names(y) == x)], y = colorbars), names(ss))
+
+i <- 1:1000
+
+
+plotTree.wBars(ASER[[sample(i, 1)]], log1p(anc_st_rp_bars), type = "fan", method = "plotSimmap", colors = cols, scale = 4, fsize = 0.2, tip.labels = FALSE, part = 0.98, col = barcols, border = FALSE)
+t1 <- max(nodeHeights(ctree_st))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t1, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(119, 45, "1", cex = 1)
+text(32, 90, "2", cex = 1)
+text(-105, 25, "3", cex = 1)
+text(-135, -70, "4", cex = 1)
+text(-45, -65, "5", cex = 1)
+text(-8, -95, "6", cex = 1)
+text(scale, rep(-23, length(scale)), t1 - scale, cex = 0.9)
+text(mean(scale), -40, "time (mya)", cex = 0.9)
+nodelabels(pie = pd$ace, piecol = cols, cex = 0.26)
+add.simmap.legend(colors = cols, prompt = FALSE, x = -120, y = 140, fsize = 0.9)
+
+dev.off()
+
+
+jpeg("tree_ASERT_pailess.jpeg", height = 2000, width = 2000, res = 250)
+
+colst <- setNames(colors[1:length(unique(forgt))], sort(unique(forgt)))
+sst <-getStates(ASERT, "tips")
+colorbars <-setNames(c("red", "skyblue", "purple"), c("mixed", "sit and wait", "widely foraging"))
+barcolst <- setNames(sapply(sst, function(x, y) y[which(names(y) == x)], y = colorbars), names(sst))
+
+iT <- 1:1000
+
+plotTree.wBars(ASERT[[sample(iT, 1)]], log1p(anc_st_rp_bars[-486]), type = "fan", method = "plotSimmap", colors = colst, scale = 4, fsize = 0.2, tip.labels = FALSE, part = 0.98, col = barcolst, border = FALSE)
+t2 <- max(nodeHeights(ctree))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t2, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(55, 20, "1", cex = 1)
+text(10, 20, "2", cex = 1)
+text(-30, 8, "3", cex = 1)
+text(-72, -38, "4", cex = 1)
+text(-11, -24, "5", cex = 1)
+text(-8, -40, "6", cex = 1)
+text(scale, rep(-20, length(scale)), t2 - scale, cex = 0.7)
+text(mean(scale), -35, "time (mya)", cex = 0.9)
+#nodelabels(pie = pdt$ace, piecol = colst, cex = 0.3)
+add.simmap.legend(colors = colst, prompt = FALSE, x = -80, y = 90, fsize = 0.9)
+
+dev.off()
+
+
+jpeg("tree_ASERT.jpeg", height = 2000, width = 2000, res = 250)
+
+colst <- setNames(colors[1:length(unique(forgt))], sort(unique(forgt)))
+sst <-getStates(ASERT, "tips")
+colorbars <-setNames(c("red", "skyblue", "purple"), c("mixed", "sit and wait", "widely foraging"))
+barcolst <- setNames(sapply(sst, function(x, y) y[which(names(y) == x)], y = colorbars), names(sst))
+
+iT <- 1:1000
+
+plotTree.wBars(ASERT[[sample(iT, 1)]], log1p(anc_st_rp_bars[-486]), type = "fan", method = "plotSimmap", colors = colst, scale = 4, fsize = 0.2, tip.labels = FALSE, part = 0.98, col = barcolst, border = FALSE)
+t2 <- max(nodeHeights(ctree))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t2, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(55, 20, "1", cex = 1)
+text(10, 20, "2", cex = 1)
+text(-30, 8, "3", cex = 1)
+text(-72, -38, "4", cex = 1)
+text(-11, -24, "5", cex = 1)
+text(-8, -40, "6", cex = 1)
+text(scale, rep(-20, length(scale)), t2 - scale, cex = 0.7)
+text(mean(scale), -35, "time (mya)", cex = 0.9)
+nodelabels(pie = pdt$ace, piecol = colst, cex = 0.26)
+add.simmap.legend(colors = colst, prompt = FALSE, x = -80, y = 90, fsize = 0.9)
+
+dev.off()
+
+```
+
+
+
+</br></br></br>
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE}
+
+
+## Internal nodes numbering
+
+plotTree.wBars(ASER[[sample(i, 1)]], log1p(anc_st_rp_bars), type = "fan", method = "plotSimmap", colors = cols, scale = 4, fsize = 0.2, tip.labels = FALSE, part = 0.98, col = barcols, border = FALSE)
+t1 <- max(nodeHeights(ctree_st))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t1, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(115, 45, "1", cex = 1)
+text(32, 90, "2", cex = 1)
+text(-105, 25, "3", cex = 1)
+text(-135, -70, "4", cex = 1)
+text(-45, -65, "5", cex = 1)
+text(-8, -95, "6", cex = 1)
+text(scale, rep(-23, length(scale)), t1 - scale, cex = 0.6)
+text(mean(scale), -40, "time (mya)", cex = 0.7)
+nodelabels(bg = "white", cex = 0.5)
+
+
+
+## Standard tree
+
+plot(ASER[[sample(i, 1)]], colors = cols, ftype = "off")
+
+
+## Standard tree
+
+plot(ASER[[sample(i, 1)]], colors = cols, ftype = "off")
+nodelabels(bg = "white", cex = 0.5)
+
+
+## Ancestral character state reconstruction without mixed foraging species
+
+
+colors2 <- c("skyblue", "purple")
+cols2 <- setNames(colors2[1:length(unique(forg2))], sort(unique(forg2)))
+colorbars2 <-setNames(c("skyblue", "purple"), c("sit and wait", "widely foraging"))
+ss2 <- getStates(ASSYM2, "tips")
+barcols2 <- setNames(sapply(ss2, function(x, y) y[which(names(y) == x)], y = colorbars2), names(ss2))
+
+i2 <- 1:1000
+
+plotTree.wBars(ASSYM2[[sample(i2, 1)]], log1p(anc_st_rp2_bars), type = "fan", method = "plotSimmap", colors = cols2, scale = 4, fsize = 0.2, tip.labels = FALSE, part = 0.98, col = barcols2, border = FALSE)
+t3 <- max(nodeHeights(ctree_rp2))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t3, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(115, 45, "1", cex = 1)
+text(45, 85, "2", cex = 1)
+text(-105, 35, "3", cex = 1)
+text(-137, -68, "4", cex = 1)
+text(-45, -65, "5", cex = 1)
+text(-8, -95, "6", cex = 1)
+text(scale, rep(-23, length(scale)), t3 - scale, cex = 0.9)
+text(mean(scale), -40, "time (mya)", cex = 0.9)
+nodelabels(pie = pd2$ace, piecol = cols2, cex = 0.26)
+add.simmap.legend(colors = cols2, prompt = FALSE, x = -120, y = 140, fsize = 0.8)
+
+
+
+## Excluding the tuatara
+
+i2T <- 1:1000
+
+colors2T <- c("skyblue", "purple")
+cols2T <- setNames(colors2T[1:length(unique(forg2T))], sort(unique(forg2T)))
+colorbars2T <-setNames(c("skyblue", "purple"), c("sit and wait", "widely foraging"))
+ss2T <- getStates(ASSYMT, "tips")
+barcols2T <- setNames(sapply(ss2T, function(x, y) y[which(names(y) == x)], y = colorbars2T), names(ss2T))
+
+
+plotTree.wBars(ASSYMT[[sample(i2T, 1)]], log1p(anc_st_rp2_bars[-425]), type = "fan", method = "plotSimmap", colors = cols2T, scale = 4, fsize = 0.2, tip.labels = FALSE, part = 0.98, col = barcols2T, border = FALSE)
+t4 <- max(nodeHeights(ctree_st2))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t4, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(55, 20, "1", cex = 1)
+text(14, 20, "2", cex = 1)
+text(-30, 8, "3", cex = 1)
+text(-72, -35, "4", cex = 1)
+text(-11, -24, "5", cex = 1)
+text(-8, -40, "6", cex = 1)
+text(scale, rep(-20, length(scale)), t4 - scale, cex = 0.7)
+text(mean(scale), -40, "time (mya)", cex = 0.9)
+nodelabels(pie = pd2T$ace, piecol = cols2T, cex = 0.26)
+add.simmap.legend(colors = cols2T, prompt = FALSE, x = -70, y = 80, fsize = 0.8)
+
+
+```
+
+
+
+```{r, echo = TRUE, fig.height = 7, fig.width = 7, fig.align = "center", warning = FALSE, comment = " ", message = FALSE, include = FALSE}
+
+
+jpeg("tree_ASSYM2_pailess.jpeg", height = 2000, width = 2000, res = 250)
+
+
+colors2 <- c("skyblue", "purple")
+cols2 <- setNames(colors2[1:length(unique(forg2))], sort(unique(forg2)))
+colorbars2 <-setNames(c("skyblue", "purple"), c("sit and wait", "widely foraging"))
+ss2 <- getStates(ASSYM2, "tips")
+barcols2 <- setNames(sapply(ss2, function(x, y) y[which(names(y) == x)], y = colorbars2), names(ss2))
+
+i2 <- 1:1000
+
+plotTree.wBars(ASSYM2[[sample(i2, 1)]], log1p(anc_st_rp2_bars), type = "fan", method = "plotSimmap", colors = cols2, scale = 4, fsize = 0.2, tip.labels = FALSE, part = 0.98, col = barcols2, border = FALSE)
+t3 <- max(nodeHeights(ctree_rp2))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t3, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(115, 45, "1", cex = 1)
+text(45, 85, "2", cex = 1)
+text(-105, 35, "3", cex = 1)
+text(-137, -68, "4", cex = 1)
+text(-45, -65, "5", cex = 1)
+text(-8, -95, "6", cex = 1)
+text(scale, rep(-23, length(scale)), t3 - scale, cex = 0.9)
+text(mean(scale), -40, "time (mya)", cex = 0.9)
+#nodelabels(pie = pd2$ace, piecol = cols2, cex = 0.26)
+add.simmap.legend(colors = cols2, prompt = FALSE, x = -120, y = 140, fsize = 0.8)
+
+
+dev.off()
+
+
+jpeg("tree_ASSYM2.jpeg", height = 2000, width = 2000, res = 250)
+
+
+colors2 <- c("skyblue", "purple")
+cols2 <- setNames(colors2[1:length(unique(forg2))], sort(unique(forg2)))
+colorbars2 <-setNames(c("skyblue", "purple"), c("sit and wait", "widely foraging"))
+ss2 <- getStates(ASSYM2, "tips")
+barcols2 <- setNames(sapply(ss2, function(x, y) y[which(names(y) == x)], y = colorbars2), names(ss2))
+
+i2 <- 1:1000
+
+plotTree.wBars(ASSYM2[[sample(i2, 1)]], log1p(anc_st_rp2_bars), type = "fan", method = "plotSimmap", colors = cols2, scale = 4, fsize = 0.2, tip.labels = FALSE, part = 0.98, col = barcols2, border = FALSE)
+t3 <- max(nodeHeights(ctree_rp2))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t3, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(115, 45, "1", cex = 1)
+text(45, 85, "2", cex = 1)
+text(-105, 35, "3", cex = 1)
+text(-137, -68, "4", cex = 1)
+text(-45, -65, "5", cex = 1)
+text(-8, -95, "6", cex = 1)
+text(scale, rep(-23, length(scale)), t3 - scale, cex = 0.9)
+text(mean(scale), -40, "time (mya)", cex = 0.9)
+nodelabels(pie = pd2$ace, piecol = cols2, cex = 0.26)
+add.simmap.legend(colors = cols2, prompt = FALSE, x = -120, y = 140, fsize = 0.8)
+
+
+dev.off()
+
+
+
+jpeg("tree_ASSYMT_pailess.jpeg", height = 2000, width = 2000, res = 250)
+
+## Excluding the tuatara
+
+i2T <- 1:1000
+
+colors2T <- c("skyblue", "purple")
+cols2T <- setNames(colors2T[1:length(unique(forg2T))], sort(unique(forg2T)))
+colorbars2T <-setNames(c("skyblue", "purple"), c("sit and wait", "widely foraging"))
+ss2T <- getStates(ASSYMT, "tips")
+barcols2T <- setNames(sapply(ss2T, function(x, y) y[which(names(y) == x)], y = colorbars2T), names(ss2T))
+
+
+plotTree.wBars(ASSYMT[[sample(i2T, 1)]], log1p(anc_st_rp2_bars[-425]), type = "fan", method = "plotSimmap", colors = cols2T, scale = 4, fsize = 0.2, tip.labels = FALSE, part = 0.98, col = barcols2T, border = FALSE)
+t4 <- max(nodeHeights(ctree_st2))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t4, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(55, 20, "1", cex = 1)
+text(14, 20, "2", cex = 1)
+text(-30, 8, "3", cex = 1)
+text(-72, -35, "4", cex = 1)
+text(-11, -24, "5", cex = 1)
+text(-8, -40, "6", cex = 1)
+text(scale, rep(-20, length(scale)), t4 - scale, cex = 0.7)
+text(mean(scale), -40, "time (mya)", cex = 0.9)
+#nodelabels(pie = pd2T$ace, piecol = cols2T, cex = 0.22)
+add.simmap.legend(colors = cols2T, prompt = FALSE, x = -70, y = 80, fsize = 0.8)
+
+
+dev.off()
+
+
+jpeg("tree_ASSYMT.jpeg", height = 2000, width = 2000, res = 250)
+
+## Excluding the tuatara
+
+i2T <- 1:1000
+
+colors2T <- c("skyblue", "purple")
+cols2T <- setNames(colors2T[1:length(unique(forg2T))], sort(unique(forg2T)))
+colorbars2T <-setNames(c("skyblue", "purple"), c("sit and wait", "widely foraging"))
+ss2T <- getStates(ASSYMT, "tips")
+barcols2T <- setNames(sapply(ss2T, function(x, y) y[which(names(y) == x)], y = colorbars2T), names(ss2T))
+
+
+plotTree.wBars(ASSYMT[[sample(i2T, 1)]], log1p(anc_st_rp2_bars[-425]), type = "fan", method = "plotSimmap", colors = cols2T, scale = 4, fsize = 0.2, tip.labels = FALSE, part = 0.98, col = barcols2T, border = FALSE)
+t4 <- max(nodeHeights(ctree_st2))
+tick.spacing <- 25
+min.tick <- 0
+scale <- axis(1, pos = -5, at = seq(t4, min.tick, by = -tick.spacing), cex.axis = 0.5, labels = FALSE)
+
+for(i in 1:length(scale)){
+    a1 <- 0
+    a2 <- 2*pi
+    draw.arc(0, 0, radius = scale[i], a1, a2, lwd = 1,
+        col = make.transparent("blue", 0.15))
+}
+
+text(55, 20, "1", cex = 1)
+text(14, 20, "2", cex = 1)
+text(-30, 8, "3", cex = 1)
+text(-72, -35, "4", cex = 1)
+text(-11, -24, "5", cex = 1)
+text(-8, -40, "6", cex = 1)
+text(scale, rep(-20, length(scale)), t4 - scale, cex = 0.7)
+text(mean(scale), -40, "time (mya)", cex = 0.9)
+nodelabels(pie = pd2T$ace, piecol = cols2T, cex = 0.26)
+add.simmap.legend(colors = cols2T, prompt = FALSE, x = -70, y = 80, fsize = 0.8)
+
+dev.off()
+
+```
