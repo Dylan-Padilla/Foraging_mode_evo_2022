@@ -13,12 +13,12 @@ GENERAL INFORMATION
 		Institution: Arizona State University
 		Address: School of Life Sciences
 		Email: dpadil10@asu.edu
-
-        B. Principal Investigator Contact Information
+		
+	B. Principal Investigator Contact Information
 		Name: Dale F. DeNardo
 		Institution: Arizona State University
 		Address: School of Life Sciences
-		Email: denardo@asu.edu
+		Email: denardo@asu.edu	
 
 	C. Associate or Co-investigator Contact Information
 		Name: Michael J. Angilletta Jr.
